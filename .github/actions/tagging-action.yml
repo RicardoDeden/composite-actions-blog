@@ -1,0 +1,86 @@
+name: "Tagging Action"
+description: "Composite action for tagging a commit based on the commit message header"
+inputs:
+  # Define inputs here
+outputs:
+  NEW_VERSION_TAG:
+    description: "The new version tag created by this composite action"
+    value: ${{ steps.bump_version.outputs.NEW_VERSION_TAG }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    # Get the commit message header, which is set when we merge the pull request
+    - name: Get commit message header
+      id: get_commit_header
+      run: |
+        PR_TITLE=$(git log -1 --pretty=%B | sed -n 3p)
+        echo "pr_title=$PR_TITLE" >> $GITHUB_ENV
+      shell: bash
+
+    # We only want to tag commits following the "major", "minor", "patch" format
+    # We'll also convert the commit header to lowercase to make the check case-insensitive
+    - name: Check commit header prefix
+      run: |
+        title="${{ env.pr_title }}"
+        title_lower=$(echo "$title" | tr '[:upper:]' '[:lower:]')
+        if [[ ! "$title_lower" =~ ^(major|minor|patch) ]]; then
+          echo "Commit message header does not start with 'major', 'minor', or 'patch'."
+          exit 1
+        fi
+        shell: bash
+
+    # Get the last tag version, so we can later determine the correct increment
+    - name: Get last tag version
+      id: get_last_tag
+      run: |
+        git fetch --tags
+        LAST_TAG=$(git tag | sort -V | tail -n 1)
+        if [ -z "$LAST_TAG" ]; then
+          echo "No tags found in the repository."
+          exit 1
+        fi
+        echo "last_tag=$LAST_TAG" >> $GITHUB_ENV
+      shell: bash
+
+    # Install the semver package to help us determine the next version
+    - name: Install SemVer
+      run: |
+        npm install semver
+      shell: bash
+
+    # We use SemVer to determine the next version tag, and set the tag as an output for use later in the workflow
+    - name: Bump version
+      id: bump_version
+      run: |
+        LAST_TAG="${{ env.last_tag }}"
+        title="${{ env.pr_title }}"
+        title_lower=$(echo "$title" | tr '[:upper:]' '[:lower:]')
+        if [[ "$title_lower" =~ ^major ]]; then
+          NEW_VERSION=$(semver $LAST_TAG --increment major)
+        elif [[ "$title_lower" =~ ^minor ]]; then
+          NEW_VERSION=$(semver $LAST_TAG --increment minor)
+        elif [[ "$title_lower" =~ ^patch ]]; then
+          NEW_VERSION=$(semver $LAST_TAG --increment patch)
+        else
+          echo "Increment must match either 'major', 'minor', or 'patch'. Exiting..."
+          exit 1
+        fi
+        echo "new_version_tag=v$NEW_VERSION" >> $GITHUB_ENV
+        echo "NEW_VERSION_TAG=$NEW_VERSION" >> $GITHUB_OUTPUT
+      shell: bash
+
+    # Tag the merge commit with the new version tag, and update the latest tag
+    - name: Tag merge commit and set latest tag
+      run: |
+        git config user.name "github-actions"
+        git config user.email "github-actions@github.com"
+        git tag ${{ env.new_version_tag }}
+        git tag -f latest
+        git push origin ${{ env.new_version_tag }}
+        git push origin -f latest
+        echo "Tagged commit with ${{ env.new_version_tag }} and updated latest tag"
+      shell: bash
