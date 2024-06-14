@@ -16,3 +16,5 @@ jobs:
 
       - name: Use Tagging Composite Action
         uses: ./.github/actions/tagging-action
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,5 +1,9 @@
 name: "Tagging Action"
 description: "Composite action for tagging a commit based on the commit message header"
+inputs:
+  GITHUB_TOKEN:
+    description: "GitHub token"
+    required: true
 outputs:
   NEW_VERSION_TAG:
     description: "The new version tag created by this composite action"
