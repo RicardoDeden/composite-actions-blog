@@ -47,7 +47,7 @@ runs:
     # Install the semver package to help us determine the next version
     - name: Install SemVer
       run: |
-        npm install semver
+        npm install -g semver
       shell: bash
 
     # We use SemVer to determine the next version tag, and set the tag as an output for use later in the workflow
