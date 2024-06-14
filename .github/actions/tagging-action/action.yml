@@ -31,7 +31,7 @@ runs:
           echo "Commit message header does not start with 'major', 'minor', or 'patch'."
           exit 1
         fi
-        shell: bash
+      shell: bash
 
     # Get the last tag version, so we can later determine the correct increment
     - name: Get last tag version
